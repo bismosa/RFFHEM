@@ -3,11 +3,10 @@
 # Return 0 when test run is okay
 # Return 1 when there was an test error
 # Return 254 no connection to fhem process possible
-# Return 255 if fhem.pl was not found
+# Return 255 if fhemcl.sh was not found
 
-
-FHEM_SCRIPT="/opt/fhem/fhem.pl"
-
+FHEM_SCRIPT="./test/fhemcl.sh"
+FHEM_PORT=8083
 VERBOSE=0
 
 if [ ! -z $2 ]; then
@@ -18,10 +17,7 @@ fi
 
 
 if [ ! -f $FHEM_SCRIPT ]; then
-	FHEM_SCRIPT="./fhem/fhem.pl"
-	if [ ! -f $FHEM_SCRIPT ]; then
 		exit 255
-	fi
 fi
 #printf "Script %s\n" $FHEM_SCRIPT
 
@@ -32,8 +28,7 @@ a=0
 # Check if connection to fhem process is possible
 while  true 
 do 
-	
-	if perl $FHEM_SCRIPT 7072 \"LIST\" 
+	if $FHEM_SCRIPT $FHEM_PORT "LIST" 
 	then
 		break
 	fi
@@ -46,7 +41,6 @@ do
 	a=$((a+1))
 done
 
-
 #RETURN=$(echo "reload 98_UnitTest" | /bin/nc localhost 7072)
 #echo $RETURN
 
@@ -55,39 +49,41 @@ printf "\n\n--------- Starting test %s: ---------\n" "$1"
 
 # Load test definitions, and import them to our running instance
 oIFS=$IFS
-IFS=$'\n'  # Split into array at every ";" char 
+IFS=$'\n'  # Split into array at every "linebreak" 
 command eval CMD='($(<test/$1-definition.txt))'
 IFS=$oIFS
 unset oIFS  
-command eval DEF='$(printf "%s" ${CMD[@]})'  # Add after every line ;; and store in DEF
+command eval DEF='$(printf "%s" ${CMD[@]})'  
 
 CMD=$DEF
 unset DEF
 
-CMD=$( echo $CMD | sed '/{/,/}/s/;/;;/g')
+CMD=$( echo $CMD | sed '/{/,/}/s/;/;;/g') # double every ; 
 #echo $CMD
 #CMD=$(printf "%s" $CMD | awk 'BEGIN{RS="\n" ; ORS=" ";}{ print }' )
 #CMD=$(printf "%q" $CMD )
 
-
 #echo $CMD
 #RETURN=$(perl $FHEM_SCRIPT 7072 "$CMD")
-RETURN=$(echo "$CMD" | /bin/nc localhost 7072)
+RETURN=$(cat "test/$1-definition.txt" | $FHEM_SCRIPT $FHEM_PORT)
 echo "$RETURN"
 
 #Wait until state of current test is finished
 #Todo prevent forever loop here
-CMD="{ReadingsVal(\"$1\",\"state\",\"\")}"
-until [ "$(perl $FHEM_SCRIPT 7072 "$CMD")" == "finished" ] ; do 
+
+CMD="{ReadingsVal(\"$1\",\"state\",\"\");;}"
+CMD_RET=""
+until [[ "$CMD_RET" =~ "finished" ]] ; do 
+  CMD_RET=$($FHEM_SCRIPT $FHEM_PORT "$CMD")
   sleep 1; 
 done
 
 CMD="{ReadingsVal(\"$1\",\"test_output\",\"\")}"
-OUTPUT=$(echo "$CMD" | /bin/nc localhost 7072)
+OUTPUT=$($FHEM_SCRIPT $FHEM_PORT "$CMD")
 OUTPUT=$(echo "$OUTPUT" | awk '{gsub(/\\n/,"\n")}1')
 
 CMD="{ReadingsVal(\"$1\",\"test_failure\",\"\")}"
-OUTPUT_FAILED=$(echo "$CMD" | /bin/nc localhost 7072)
+OUTPUT_FAILED=$($FHEM_SCRIPT $FHEM_PORT "$CMD")
 testlog=$(awk '/Test '"$1"' starts here ---->/,/<---- Test '"$1"' ends here/' /opt/fhem/log/fhem-*.log)
 
 
