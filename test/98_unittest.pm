@@ -134,53 +134,75 @@ sub UnitTest_Notify($$)
 }
 
 
-sub UnitTest_Test_generic
+sub UnitTest_run
 {
-	
-	# Define some generic vars for our Test
 	my $hash = shift;
+	
 	my $name = $hash->{NAME};
 	my $target = $hash->{targetDevice};
 	my $targetHash = $defs{$target};
 	Log3 $name, 3, "---- Test $name starts here ---->";
 	
+	my %test_results;
+	$test_results{name} = $name ;
+	$test_results{test_output}="";
+	$test_results{test_failure}="";
+	$test_results{todo_output}="";
 	# Redirect Test Output to internals
-	Test::More->builder->output(\$hash->{test_output});
-	Test::More->builder->failure_output(\$hash->{test_failure});
-	Test::More->builder->todo_output(\$hash->{todo_output});
+	Test::More->builder->output(\%test_results->{test_output});
+	Test::More->builder->failure_output(\%test_results->{test_failure});
+	Test::More->builder->todo_output(\%test_results->{todo_output});
 	
 	# Disable warnings for prototype mismatch
 	$SIG{__WARN__} = sub {CORE::say $_[0] if $_[0] !~ /Prototype/};
 	
 	Log3 $name, 5, "$name: Running now this code ".$hash->{'.testcode'} if ($hash->{'.testcode'});
 	
-	readingsSingleUpdate($hash, "state", "running", 1);
-	my $ret ="";
-	$ret =eval $hash->{'.testcode'} if ($hash->{'.testcode'});
-	unless ($ret) {
-		Log3 $name, 5, "$name: return from eval was with error $@" ;
-	}
-	if ($ret)
-	{
-		Log3 $name, 5, "$name: Test has following result: $ret" ;
-	}
+	
+	%test_results->{eval} =eval $hash->{'.testcode'} if ($hash->{'.testcode'});
 
 	# enable warnings for prototype mismatch
 	$SIG{__WARN__} = sub {CORE::say $_[0]};
+	#print Dumper(encode_json(\%test_results));
 	
-	#$hash->{test_output} =~ tr{\n]{ };
-	#$hash->{test_output} =~ s{\n}{\\n}g;
-    
-    my @test_output_list = split "\n",$hash->{test_output};	
+	return encode_json(\%test_results);
+	
+}
+
+sub UnitTest_finished
+{
+	use Data::Dumper;
+	my $json=shift;
+	#print Dumper(\$json);
+	my $test_results =decode_json($json);
+#	print Dumper(\%test_results);
+
+
+	
+	my $hash =  $defs{$test_results->{name}};	
+	
+	my $name = $hash->{NAME};
+	
+
+	unless ($test_results->{eval}) {
+		Log3 $name, 5, "$name: return from eval was with error $@" ;
+	}
+	if ($test_results->{eval})
+	{
+		Log3 $name, 5, "$name: Test has following result: $test_results->{eval}" ;
+	}
+
+
+	my @test_output_list = split "\n",$test_results->{test_output};	
     foreach my $logine(@test_output_list) {
     		Log3 $name, 3, $logine;
     	
     }
-    my @test_failure_list = split "\n",$hash->{test_failure};	
+    my @test_failure_list = split "\n",$test_results->{test_failure};	
     foreach my $logine(@test_failure_list) {
     		Log3 $name, 3, $logine;
     }
-    my @test_todo_list = split "\n",$hash->{test_todo} if $hash->{test_todo};
+    my @test_todo_list = split "\n",$test_results->{test_todo} if $test_results->{test_todo};
     foreach my $logine(@test_todo_list) {
     		Log3 $name, 3, $logine;
     }
@@ -189,11 +211,28 @@ sub UnitTest_Test_generic
 	
 	readingsBeginUpdate($hash);
 	readingsBulkUpdate($hash, "state", "finished", 1);
-	readingsBulkUpdate($hash, "test_output", "$hash->{test_output}" , 1);
-	readingsBulkUpdate($hash, "test_failure", $hash->{test_failure} , 1);
-	readingsBulkUpdate($hash, "todo_output", $hash->{todo_output} , 1);
+	readingsBulkUpdate($hash, "test_output", $test_results->{test_output} , 1);
+	readingsBulkUpdate($hash, "test_failure", $test_results->{test_failure} , 1);
+	readingsBulkUpdate($hash, "todo_output", $test_results->{todo_output} , 1);
 	readingsEndUpdate($hash,1);
+}
 
+sub UnitTest_Test_generic
+{
+	
+	# Define some generic vars for our Test
+	my $hash = shift;	
+	readingsSingleUpdate($hash, "state", "running", 1);
+	BlockingCall("UnitTest_run", $hash, "UnitTest_finished", 300);
+
+	
+	
+	#UnitTest_run($hash);
+	#UnitTest_finished($hash);
+
+	#$hash->{test_output} =~ tr{\n]{ };
+	#$hash->{test_output} =~ s{\n}{\\n}g;
+    
 
 }
 
