@@ -65,7 +65,8 @@ CMD=$( echo $CMD | sed '/{/,/}/s/;/;;/g') # double every ;
 
 #echo $CMD
 #RETURN=$(perl $FHEM_SCRIPT 7072 "$CMD")
-RETURN=$(cat "test/$1-definition.txt" | $FHEM_SCRIPT $FHEM_PORT)
+#RETURN=$(cat "test/$1-definition.txt" | $FHEM_SCRIPT $FHEM_PORT)
+RETURN=$(echo $CMD | $FHEM_SCRIPT $FHEM_PORT)
 echo "$RETURN"
 
 #Wait until state of current test is finished
@@ -78,6 +79,9 @@ until [[ "$CMD_RET" =~ "finished" ]] ; do
   sleep 1; 
 done
 
+##
+## curl -s "http://127.0.0.1:8083/fhem?cmd=jsonlist2%20test_defineDefaults%20test_output%20test_failure%20test_output%20todo_output&XHR=1" | jq '.Results[].Readings | {test_output, test_failure, todo_output}'
+##
 CMD="{ReadingsVal(\"$1\",\"test_output\",\"\")}"
 OUTPUT=$($FHEM_SCRIPT $FHEM_PORT "$CMD")
 OUTPUT=$(echo "$OUTPUT" | awk '{gsub(/\\n/,"\n")}1')
