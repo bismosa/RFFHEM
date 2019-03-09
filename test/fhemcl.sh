@@ -31,11 +31,8 @@ else
     hosturl=$1
 fi
 
-# get Token via http Head request
+# get Token via http request
 token=$(curl -s -D - "$hosturl/fhem?XHR=1" | awk '/X-FHEM-csrfToken/{print $2}')
-if [ -z "${token}" ]; then 
-	exit 1
-fi
 
 # reading FHEM command, from Pipe, File or Arguments 
 # Check to see if a pipe exists on stdin.
