@@ -50,7 +50,7 @@ else
             #echo "Reading File: ${2}"
             readarray -t cmdarray < "${2}"
         else
-        echo "Reading further parameters"
+        #echo "Reading further parameters"
         for ((a=2; a<=${#}; a++)); do
             #echo "command specified: ${!a}"
             cmdarray+=("${!a}")
@@ -80,5 +80,6 @@ for ((i=0; i<${#cmdarray[*]}; i++));do
     # send command to FHEM and filter the output (tested with list...).
     # give only lines between, including the two Tags back, then remove all HTML Tags 
     #curl -s --data "fwcsrf=$token" "$hosturl/fhem?cmd=$cmd" | sed -n '/<pre>/,/<\/pre>/p' |sed 's/<[^>]*>//g'
-    curl -s --data "fwcsrf=$token" "$hosturl/fhem?cmd=$cmd" | sed -n "/<div id='content' >/,/<\/div>/p" |sed 's/<[^>]*>//g'
+    #curl -s --data "fwcsrf=$token" "$hosturl/fhem?cmd=$cmd&XHR=1" | sed -n "/<div id='content' >/,/<\/div>/p" |sed 's/<[^>]*>//g'
+    curl -s --data "fwcsrf=$token" "$hosturl/fhem?cmd=$cmd&XHR=1"
 	done
