@@ -6,6 +6,7 @@
 # Return 255 if fhemcl.sh was not found
 
 FHEM_SCRIPT="./test/fhemcl.sh"
+FHEM_HOST="localhost"
 FHEM_PORT=8083
 VERBOSE=0
 
@@ -14,7 +15,6 @@ if [ ! -z $2 ]; then
         VERBOSE=1
   fi
 fi
-
 
 if [ ! -f $FHEM_SCRIPT ]; then
 		exit 255
@@ -28,7 +28,10 @@ a=0
 # Check if connection to fhem process is possible
 while  true 
 do 
-	if $FHEM_SCRIPT $FHEM_PORT "LIST" 
+	# get Token via http request and check if server is responsive
+	FHEM_HTTPHEADER=$(curl -s -f -D - "$FHEM_HOST:$FHEM_PORT/fhem?XHR=1")
+
+	if [ $? == 0 ] 
 	then
 		break
 	fi
@@ -40,6 +43,7 @@ do
 	fi
 	a=$((a+1))
 done
+FHEM_TOKEN=$(echo $FHEM_HTTPHEADER | awk '/X-FHEM-csrfToken/{print $2}')
 
 #RETURN=$(echo "reload 98_UnitTest" | /bin/nc localhost 7072)
 #echo $RETURN
@@ -72,7 +76,8 @@ echo "$RETURN"
 #Wait until state of current test is finished
 #Todo prevent forever loop here
 
-CMD="{ReadingsVal(\"$1\",\"state\",\"\");;}"
+#CMD="{ReadingsVal(\"$1\",\"state\",\"\");;}"
+CMD="list $1 state"
 CMD_RET=""
 until [[ "$CMD_RET" =~ "finished" ]] ; do 
   CMD_RET=$($FHEM_SCRIPT $FHEM_PORT "$CMD")
@@ -80,18 +85,22 @@ until [[ "$CMD_RET" =~ "finished" ]] ; do
 done
 
 ##
-## curl -s "http://127.0.0.1:8083/fhem?cmd=jsonlist2%20test_defineDefaults%20test_output%20test_failure%20test_output%20todo_output&XHR=1" | jq '.Results[].Readings | {test_output, test_failure, todo_output}'
+## 
 ##
-CMD="{ReadingsVal(\"$1\",\"test_output\",\"\")}"
-OUTPUT=$($FHEM_SCRIPT $FHEM_PORT "$CMD")
-OUTPUT=$(echo "$OUTPUT" | awk '{gsub(/\\n/,"\n")}1')
-
-CMD="{ReadingsVal(\"$1\",\"test_failure\",\"\")}"
-OUTPUT_FAILED=$($FHEM_SCRIPT $FHEM_PORT "$CMD")
+#CMD="{ReadingsVal(\"$1\",\"test_output\",\"\")}"
+#OUTPUT=$($FHEM_SCRIPT $FHEM_PORT "$CMD")
+#OUTPUT=$(echo "$OUTPUT" | awk '{gsub(/\\n/,"\n")}1')
+CMD="jsonlist2 $1 test_output test_failure todo_output"
+OUTPUT=$($FHEM_SCRIPT $FHEM_PORT "$CMD" | jq '.Results[].Readings | {test_output, test_failure, todo_output} | del(.[][] | select(. == ""))')
+#OUTPUT=$(curl -s --data "fwcsrf=$FHEM_TOKEN" "$FHEM_HOST:$FHEM_PORT/fhem?cmd=$CMD&XHR=1" | jq '.Results[].Readings | {test_output, test_failure, todo_output} | del(.[][] | select(. == ""))')
+OUTPUT_FAILED=$(echo $OUTPUT | jq '.test_failure.Value')
 testlog=$(awk '/Test '"$1"' starts here ---->/,/<---- Test '"$1"' ends here/' /opt/fhem/log/fhem-*.log)
 
+OUTPUT_CLEAN=$(echo $OUTPUT | jq -r '.[].Value')
 
-printf "Output of %s:\n\n%s" "$1" "$OUTPUT"
+# Remove lines with null and print output
+printf "Output of %s:\n\n%s" "$1" "${OUTPUT_CLEAN//null}"
+OUTPUT_FAILED=${OUTPUT_FAILED//null}
 
 if [ -z "$OUTPUT_FAILED"  ]
 then
