@@ -2,6 +2,7 @@
 
 # Return 0 when test run is okay
 # Return 1 when there was an test error
+# Return 7 testfile was not found
 # Return 254 no connection to fhem process possible
 # Return 255 if fhemcl.sh was not found
 
@@ -9,7 +10,6 @@ FHEM_SCRIPT="./test/fhemcl.sh"
 FHEM_HOST="localhost"
 FHEM_PORT=8083
 VERBOSE=0
-
 if [ ! -z $2 ]; then
   if [ $2 = "-v" ]; then  
         VERBOSE=1
@@ -19,6 +19,11 @@ fi
 if [ ! -f $FHEM_SCRIPT ]; then
 		exit 255
 fi
+if [ ! -f "test/$1-definition.txt" ]; then
+		exit 7
+fi
+
+
 #printf "Script %s\n" $FHEM_SCRIPT
 
 IFS=
@@ -37,7 +42,7 @@ do
 	fi
 	sleep 3
 	
-	if [ $a -gt "100" ]  # Limit trys
+	if [ $a -gt "1000" ]  # Limit trys
 	then
 	  exit 254
 	fi
@@ -75,13 +80,20 @@ echo "$RETURN"
 
 #Wait until state of current test is finished
 #Todo prevent forever loop here
-
 #CMD="{ReadingsVal(\"$1\",\"state\",\"\");;}"
 CMD="list $1 state"
 CMD_RET=""
+a=0
+
 until [[ "$CMD_RET" =~ "finished" ]] ; do 
-  CMD_RET=$($FHEM_SCRIPT $FHEM_PORT "$CMD")
   sleep 1; 
+  CMD_RET=$($FHEM_SCRIPT $FHEM_PORT "$CMD")
+  if [ $a -gt "100" ]  # Limit trys
+  then
+  exit 254
+  fi
+  a=$((a+1))
+
 done
 
 ##
@@ -94,7 +106,7 @@ CMD="jsonlist2 $1 test_output test_failure todo_output"
 OUTPUT=$($FHEM_SCRIPT $FHEM_PORT "$CMD" | jq '.Results[].Readings | {test_output, test_failure, todo_output} | del(.[][] | select(. == ""))')
 #OUTPUT=$(curl -s --data "fwcsrf=$FHEM_TOKEN" "$FHEM_HOST:$FHEM_PORT/fhem?cmd=$CMD&XHR=1" | jq '.Results[].Readings | {test_output, test_failure, todo_output} | del(.[][] | select(. == ""))')
 OUTPUT_FAILED=$(echo $OUTPUT | jq '.test_failure.Value')
-testlog=$(awk '/Test '"$1"' starts here ---->/,/<---- Test '"$1"' ends here/' /opt/fhem/log/fhem-*.log)
+testlog=$(awk '/Test '"$1"' starts here ---->/,/<---- Test '"$1"' ends here/' /opt/fhem/log/fhem-*$1.log)
 
 OUTPUT_CLEAN=$(echo $OUTPUT | jq -r '.[].Value')
 

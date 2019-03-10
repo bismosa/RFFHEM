@@ -141,6 +141,12 @@ sub UnitTest_run
 	my $name = $hash->{NAME};
 	my $target = $hash->{targetDevice};
 	my $targetHash = $defs{$target};
+	
+	# Logfile can be changed for the forked process, but this has no effect, if this process is done.
+	GlobalAttr("set", "global", "logfile", "./log/fhem-%Y-%m-$name.log");
+	CommandAttr(undef,"global logfile ./log/fhem-%Y-%m-$name.log");
+
+	
 	Log3 $name, 3, "---- Test $name starts here ---->";
 	
 	my %test_results;
@@ -164,6 +170,32 @@ sub UnitTest_run
 	# enable warnings for prototype mismatch
 	$SIG{__WARN__} = sub {CORE::say $_[0]};
 	#print Dumper(encode_json(\%test_results));
+	
+	unless ($test_results{eval}) {
+		Log3 $name, 5, "$name: return from eval was with error $@" ;
+	}
+	if ($test_results{eval})
+	{
+		Log3 $name, 5, "$name: Test has following result: $test_results{eval}" ;
+	}
+
+
+	my @test_output_list = split "\n",$test_results{test_output};	
+    foreach my $logine(@test_output_list) {
+    		Log3 $name, 3, $logine;
+    	
+    }
+    my @test_failure_list = split "\n",$test_results{test_failure};	
+    foreach my $logine(@test_failure_list) {
+    		Log3 $name, 3, $logine;
+    }
+    my @test_todo_list = split "\n",$test_results{test_todo} if $test_results{test_todo};
+    foreach my $logine(@test_todo_list) {
+    		Log3 $name, 3, $logine;
+    }
+	
+	Log3 $name, 3, "<---- Test $name ends here ----";
+	
 	
 	return encode_json(\%test_results);
 	

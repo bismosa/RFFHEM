@@ -10,7 +10,6 @@ then
      echo 'echo -e "set Aktor01 toggle" | fhemcl [http://<hostName>:]<portNumber>'
      exit 1
 fi
-
 # split the first Argument
 IFS=:
 arr=("$1")
@@ -43,8 +42,9 @@ if [ -p /dev/stdin ]; then
         while IFS= read -r line; do
               cmdarray+=("${line}")
         done
+fi
 
-else
+if [ -z $cmdarray ]; then
         # Checking the 2 parameter: filename exist or simple commands
         if [ -f "$2" ]; then
             #echo "Reading File: ${2}"
@@ -57,7 +57,10 @@ else
         done
         fi
 fi
-
+if [ -z $cmdarray ]; then
+ echo "no command found"
+ exit 8
+fi 
 # loop over all lines stepping up. For stepping down (i=${#cmdarray[*]}; i>0; i--)
 for ((i=0; i<${#cmdarray[*]}; i++));do 
     # concat def lines with ending \ to the next line, remove any \r from line
@@ -82,4 +85,4 @@ for ((i=0; i<${#cmdarray[*]}; i++));do
     #curl -s --data "fwcsrf=$token" "$hosturl/fhem?cmd=$cmd" | sed -n '/<pre>/,/<\/pre>/p' |sed 's/<[^>]*>//g'
     #curl -s --data "fwcsrf=$token" "$hosturl/fhem?cmd=$cmd&XHR=1" | sed -n "/<div id='content' >/,/<\/div>/p" |sed 's/<[^>]*>//g'
     curl -s --data "fwcsrf=$token" "$hosturl/fhem?cmd=$cmd&XHR=1"
-	done
+done
