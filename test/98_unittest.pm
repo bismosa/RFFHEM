@@ -155,9 +155,9 @@ sub UnitTest_run
 	$test_results{test_failure}="";
 	$test_results{todo_output}="";
 	# Redirect Test Output to internals
-	Test::More->builder->output(\%test_results->{test_output});
-	Test::More->builder->failure_output(\%test_results->{test_failure});
-	Test::More->builder->todo_output(\%test_results->{todo_output});
+	Test::More->builder->output(\$test_results{test_output});
+	Test::More->builder->failure_output(\$test_results{test_failure});
+	Test::More->builder->todo_output(\$test_results{todo_output});
 	
 	# Disable warnings for prototype mismatch
 	$SIG{__WARN__} = sub {CORE::say $_[0] if $_[0] !~ /Prototype/};
@@ -165,7 +165,7 @@ sub UnitTest_run
 	Log3 $name, 5, "$name: Running now this code ".$hash->{'.testcode'} if ($hash->{'.testcode'});
 	
 	
-	%test_results->{eval} =eval $hash->{'.testcode'} if ($hash->{'.testcode'});
+	$test_results{eval} =eval $hash->{'.testcode'} if ($hash->{'.testcode'});
 
 	# enable warnings for prototype mismatch
 	$SIG{__WARN__} = sub {CORE::say $_[0]};
