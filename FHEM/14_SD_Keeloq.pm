@@ -103,7 +103,7 @@ sub SD_Keeloq_Initialize() {
   $hash->{ParseFn}			= "SD_Keeloq::Parse";
   $hash->{AttrList}			= "IODev MasterMSB MasterLSB KeeLoq_NLF model:".join(",", sort keys %models)." stateFormat Channels:0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16 ShowShade:0,1 ShowIcons:0,1 ShowLearn:0,1 ".
 													"UI:aus,Einzeilig,Mehrzeilig ChannelFixed:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16 ChannelNames Repeats:1,2,3,4,5,6,7,8,9 ".
-													"addGroups Serial_send LearnVersion:old,new ".$readingFnAttributes;
+													"addGroups Serial_send LearnVersion:old,new Serial_send_num16  ".$readingFnAttributes;
 	$hash->{FW_detailFn}	= "SD_Keeloq::summaryFn";
 	$hash->{FW_addDetailToSummary}	= 1;
 	$hash->{FW_deviceOverview}			= 1;
@@ -255,6 +255,30 @@ sub Attr(@) {
 					readingsSingleUpdate($hash, "user_info", "messages can be received and send!", 1);
 					readingsSingleUpdate($hash, "user_modus", "all_functions", 1);
 				}
+			
+				#Attribut Serial_send_num16 setzen
+				$attr{$name}{Serial_send_num16} = hex($attrValue) / 16;
+			}
+			
+			if ($attrName eq "Serial_send_num16") {
+				if ($attrValue > 1048575){
+					return "ERROR: the number must be less than 1048576!";
+				}
+				
+				my $SerialSend = sprintf("%06x", ( $attrValue * 16 ));
+								
+				if (ReadingsVal($name, "serial_receive", 0) eq $SerialSend) {
+					return "ERROR: your value must be different from the reading serial_receive!";
+				}
+	
+				#Attribut Serial_send setzen
+				$attr{$name}{Serial_send} = $SerialSend;
+
+				if ($MasterMSB ne "" && $MasterLSB ne "" && $attrValue ne "") {
+					readingsSingleUpdate($hash, "user_info", "messages can be received and send!", 1);
+					readingsSingleUpdate($hash, "user_modus", "all_functions", 1);
+				}
+			
 			}
 
 			### Check, eingegebener Sender als Device definiert?
@@ -980,6 +1004,7 @@ sub Parse($$) {
 
 	if ($model eq "JaroLift") {
 		readingsBulkUpdate($hash, "LastAction_Channel_".sprintf ("%02s",$channel), $button) if ($group_value eq "no");
+		readingsBulkUpdate($hash, "serial_receive_num16", (hex($serialWithoutCh) / 16), 0);
 		if ($group_value ne "no" && $group_value ne "< 9") {
 			my @group_value = split /,/, $group_value;
 			foreach (@group_value) {
@@ -1554,9 +1579,17 @@ sub SD_Keeloq_attr2htmlButtons($$$$$) {
 		<ul>- new Version: senden von <code>updown</code> und zus&auml;tzlich gefolgt von <code>stop</code></ul>
 		</li>
 		<br>		
-		<li><a name="Serial_send"><b>Serial_send</b></a><br>
-		Eine Serialnummer zum Senden. Sie MUSS eindeutig im ganzen System sein und auf 00 enden. OHNE Attribut Serial_send erh&auml;lt der User keine Setlist --> nur Empfang m&ouml;glich!<br>
+		<<li><a name="Serial_send"><b>Serial_send</b></a><br>
+		Hex-Wert (ohne 0x). Eine Serialnummer zum Senden. Sie MUSS eindeutig im ganzen System sein. OHNE Attribut Serial_send erh&auml;lt der User keine Setlist --> nur Empfang m&ouml;glich!<br>
+		Die Serialnummer muss Dezimal durch 16 Teilbar sein. Max. FFFFF0.<br>
+		Einfachere Eingabe ist über das Attribut Serial_send_num16 möglich.<br>
 		<i>Beispiel:</i> 9AC000
+		</li>
+		<br>
+		<li><a name="Serial_send_num16"><b>Serial_send_num16</b></a><br>
+		(0 - 1048575) Eine Serialnummer zum Senden. Sie MUSS eindeutig im ganzen System sein. OHNE Attribut Serial_send erh&auml;lt der User keine Setlist --> nur Empfang m&ouml;glich!<br>
+		Hier wird der Hex-Wert für Serial_send direkt gesetzt.<br>
+		<i>Beispiel:</i> 123456
 		</li>
 		<br>
 		<li><a name="ShowIcons"><b>ShowIcons</b></a><br>
@@ -1609,7 +1642,9 @@ sub SD_Keeloq_attr2htmlButtons($$$$$) {
 	<li>button<br>
 	Gedr&uuml;ckter Knopf an der Fernbedienung oder im FHEM Device</li>
 	<li>serial_receive<br>
-	Seriennummer des empfangen Ger&auml;tes</li>
+	Seriennummer des empfangenen Ger&auml;tes</li>
+	<li>serial_receive_num16<br>
+	Seriennummer des empfangenen Ger&auml;tes numerisch durch 16 geteilt.</li>
 	<li>user_info<br>
 	Informationstext f&uuml;r den Benutzer. Es werden Tips und Handlungen ausgegeben.</li>
 	<li>user_modus<br>
